@@ -106,27 +106,63 @@ def risk_profile(risk):
     return "Elevated", "10% or higher 5-year risk", "#ffe4e6", "#be123c"
 
 def num_input_block(label, unit, value, min_v, max_v, step, digits=2):
+    safe_value = float(value) if value is not None else float(min_v)
+    safe_value = max(min_v, min(max_v, safe_value))
+
     st.markdown(f'<div class="smallcap">{label}</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.0, 0.75])
     with c1:
-        v = st.number_input(label, min_value=min_v, max_value=max_v, value=float(value), step=float(step), label_visibility="collapsed")
+        v = st.number_input(
+            label,
+            min_value=float(min_v),
+            max_value=float(max_v),
+            value=float(safe_value),
+            step=float(step),
+            label_visibility="collapsed",
+        )
     with c2:
-        st.markdown(f"<div style='padding-top:0.55rem;color:#64748b;font-size:0.88rem'>{unit}</div>", unsafe_allow_html=True)
-    v = st.slider(f"{label} slider", min_value=float(min_v), max_value=float(max_v), value=float(v), step=float(step), label_visibility="collapsed")
+        st.markdown(
+            f"<div style='padding-top:0.55rem;color:#64748b;font-size:0.88rem'>{unit}</div>",
+            unsafe_allow_html=True,
+        )
+
+    v = st.slider(
+        f"{label} slider",
+        min_value=float(min_v),
+        max_value=float(max_v),
+        value=float(v),
+        step=float(step),
+        label_visibility="collapsed",
+    )
     return round(v, digits)
 
-if "sex" not in st.session_state:
-    st.session_state.sex = "Female"
-if "values" not in st.session_state:
-    st.session_state.values = PARAMS["Female"]["defaults"].copy()
+
+
+def ensure_state():
+    if "sex" not in st.session_state or st.session_state.sex not in PARAMS:
+        st.session_state.sex = "Female"
+
+    default_values = PARAMS[st.session_state.sex]["defaults"].copy()
+
+    if "values" not in st.session_state or not isinstance(st.session_state.values, dict):
+        st.session_state.values = default_values.copy()
+    else:
+        # 用默认值补齐缺失字段，避免旧版本残留状态导致报错
+        cleaned = default_values.copy()
+        cleaned.update(st.session_state.values)
+        st.session_state.values = cleaned
 
 def load_case(sex):
     st.session_state.sex = sex
     st.session_state.values = PARAMS[sex]["defaults"].copy()
 
+ensure_state()
+
 sex = st.session_state.sex
 p = PARAMS[sex]
 vals = st.session_state.values
+
+
 
 left, right = st.columns([0.9, 2.1], gap="large")
 
