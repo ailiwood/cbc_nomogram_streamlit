@@ -10,9 +10,20 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-.block-container {padding-top: 1.2rem; padding-bottom: 1.2rem; max-width: 1400px;}
-[data-testid="stMetricValue"] {font-size: 2rem;}
-.smallcap {font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #64748b;}
+.block-container {
+    padding-top: 1.2rem;
+    padding-bottom: 1.2rem;
+    max-width: 1400px;
+}
+[data-testid="stMetricValue"] {
+    font-size: 2rem;
+}
+.smallcap {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #64748b;
+}
 .panel-card {
     background: rgba(255,255,255,0.92);
     border: 1px solid #e2e8f0;
@@ -33,21 +44,39 @@ st.markdown("""
     border: 1px solid #e2e8f0;
     box-shadow: 0 10px 30px rgba(15,23,42,0.05);
 }
-.kpi-bar {height: 6px; width: 74px; border-radius: 999px; margin-bottom: 0.75rem;}
+.kpi-bar {
+    height: 6px;
+    width: 74px;
+    border-radius: 999px;
+    margin-bottom: 0.75rem;
+}
 .profile-bar-bg {
-    height: 16px; border-radius: 999px; background: #e2e8f0; overflow: hidden;
+    height: 16px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
 }
 .profile-bar-fill {
-    height: 16px; border-radius: 999px;
+    height: 16px;
+    border-radius: 999px;
     background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 48%, #f43f5e 100%);
 }
 .badge {
-    display:inline-block; border-radius:999px; padding:0.3rem 0.75rem;
-    font-size:0.82rem; border:1px solid #e2e8f0; background:white;
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.82rem;
+    border: 1px solid #e2e8f0;
+    background: white;
 }
 .summary-row {
-    display:flex; justify-content:space-between; align-items:center;
-    background:#f8fafc; border-radius:16px; padding:0.95rem 1rem; margin-bottom:0.7rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 0.95rem 1rem;
+    margin-bottom: 0.7rem;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -59,8 +88,21 @@ PARAMS = {
         "beta": {"age": 1.1177, "hrr": -0.1511, "rbc": -0.0280, "wbc": 0.1182},
         "mu": {"age": 55.59, "rbc": 4.32, "hrr": 10.31, "wbc": 6.10},
         "sigma": {"age": 10.10, "rbc": 0.44, "hrr": 1.20, "wbc": 2.00},
-        "ranges": {"age": (40.0, 79.0), "hrr": (7.0, 16.0), "rbc": (3.0, 6.0), "wbc": (2.0, 15.0)},
-        "defaults": {"age": 58.0, "hrr": 10.31, "rbc": 4.42, "wbc": 6.80, "bmi": 24.6, "sbp": 136.0, "smoking": "No"},
+        "ranges": {
+            "age": (40.0, 79.0),
+            "hrr": (7.0, 16.0),
+            "rbc": (3.0, 6.0),
+            "wbc": (2.0, 15.0),
+        },
+        "defaults": {
+            "age": 58.0,
+            "hrr": 10.31,
+            "rbc": 4.42,
+            "wbc": 6.80,
+            "bmi": 24.6,
+            "sbp": 136.0,
+            "smoking": "No",
+        },
     },
     "Male": {
         "label": "Male",
@@ -68,13 +110,86 @@ PARAMS = {
         "beta": {"age": 0.9886, "hrr": -0.0811, "rbc": -0.0501, "wbc": 0.1331},
         "mu": {"age": 56.39, "rbc": 4.72, "hrr": 11.61, "wbc": 6.80},
         "sigma": {"age": 10.41, "rbc": 0.55, "hrr": 1.36, "wbc": 2.30},
-        "ranges": {"age": (40.0, 79.0), "hrr": (7.0, 16.0), "rbc": (3.0, 6.5), "wbc": (2.0, 15.0)},
-        "defaults": {"age": 58.0, "hrr": 11.61, "rbc": 4.92, "wbc": 6.80, "bmi": 25.8, "sbp": 136.0, "smoking": "No"},
+        "ranges": {
+            "age": (40.0, 79.0),
+            "hrr": (7.0, 16.0),
+            "rbc": (3.0, 6.5),
+            "wbc": (2.0, 15.0),
+        },
+        "defaults": {
+            "age": 58.0,
+            "hrr": 11.61,
+            "rbc": 4.92,
+            "wbc": 6.80,
+            "bmi": 25.8,
+            "sbp": 136.0,
+            "smoking": "No",
+        },
     },
 }
 
+REQUIRED_VALUE_KEYS = ["age", "hrr", "rbc", "wbc", "bmi", "sbp", "smoking"]
+
+
+def safe_float(value, fallback):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(fallback)
+
+
+def sanitize_values(raw_values, sex):
+    defaults = PARAMS[sex]["defaults"].copy()
+
+    if not isinstance(raw_values, dict):
+        return defaults
+
+    cleaned = defaults.copy()
+    for key in REQUIRED_VALUE_KEYS:
+        if key in raw_values and raw_values[key] is not None:
+            cleaned[key] = raw_values[key]
+
+    # 强制修正类型
+    cleaned["age"] = safe_float(cleaned["age"], defaults["age"])
+    cleaned["hrr"] = safe_float(cleaned["hrr"], defaults["hrr"])
+    cleaned["rbc"] = safe_float(cleaned["rbc"], defaults["rbc"])
+    cleaned["wbc"] = safe_float(cleaned["wbc"], defaults["wbc"])
+    cleaned["bmi"] = safe_float(cleaned["bmi"], defaults["bmi"])
+    cleaned["sbp"] = safe_float(cleaned["sbp"], defaults["sbp"])
+    cleaned["smoking"] = "Yes" if str(cleaned["smoking"]) == "Yes" else "No"
+
+    # 核心变量按范围裁剪
+    for key in ["age", "hrr", "rbc", "wbc"]:
+        lo, hi = PARAMS[sex]["ranges"][key]
+        cleaned[key] = max(lo, min(hi, cleaned[key]))
+
+    return cleaned
+
+
+def ensure_state():
+    sex = st.session_state.get("sex", "Female")
+    if sex not in PARAMS:
+        sex = "Female"
+    st.session_state.sex = sex
+
+    values = st.session_state.get("values", None)
+    st.session_state.values = sanitize_values(values, sex)
+
+    model = st.session_state.get("model", "Model 2")
+    if model != "Model 2":
+        model = "Model 2"
+    st.session_state.model = model
+
+
+def load_case(sex):
+    st.session_state.sex = sex
+    st.session_state.values = PARAMS[sex]["defaults"].copy()
+    st.session_state.model = "Model 2"
+
+
 def z_score(x, mu, sigma):
     return (x - mu) / sigma
+
 
 def calc(values, p):
     z = {
@@ -95,6 +210,7 @@ def calc(values, p):
     risk_index = 100 / (1 + math.exp(-lp))
     return z, contrib, lp, relative_hazard, risk, risk_index
 
+
 def risk_profile(risk):
     pct = risk * 100
     if pct < 2.5:
@@ -105,15 +221,17 @@ def risk_profile(risk):
         return "Intermediate", "5.0%–9.9% 5-year risk", "#ffedd5", "#9a3412"
     return "Elevated", "10% or higher 5-year risk", "#ffe4e6", "#be123c"
 
-def num_input_block(label, unit, value, min_v, max_v, step, digits=2):
-    safe_value = float(value) if value is not None else float(min_v)
+
+def num_input_block(name, label, unit, value, min_v, max_v, step, digits=2):
+    safe_value = safe_float(value, min_v)
     safe_value = max(min_v, min(max_v, safe_value))
 
     st.markdown(f'<div class="smallcap">{label}</div>', unsafe_allow_html=True)
+
     c1, c2 = st.columns([1.0, 0.75])
     with c1:
-        v = st.number_input(
-            label,
+        number_value = st.number_input(
+            f"{name}_number",
             min_value=float(min_v),
             max_value=float(max_v),
             value=float(safe_value),
@@ -126,43 +244,24 @@ def num_input_block(label, unit, value, min_v, max_v, step, digits=2):
             unsafe_allow_html=True,
         )
 
-    v = st.slider(
-        f"{label} slider",
+    slider_value = st.slider(
+        f"{name}_slider",
         min_value=float(min_v),
         max_value=float(max_v),
-        value=float(v),
+        value=float(number_value),
         step=float(step),
         label_visibility="collapsed",
     )
-    return round(v, digits)
 
+    return round(slider_value, digits)
 
-
-def ensure_state():
-    if "sex" not in st.session_state or st.session_state.sex not in PARAMS:
-        st.session_state.sex = "Female"
-
-    default_values = PARAMS[st.session_state.sex]["defaults"].copy()
-
-    if "values" not in st.session_state or not isinstance(st.session_state.values, dict):
-        st.session_state.values = default_values.copy()
-    else:
-        # 用默认值补齐缺失字段，避免旧版本残留状态导致报错
-        cleaned = default_values.copy()
-        cleaned.update(st.session_state.values)
-        st.session_state.values = cleaned
-
-def load_case(sex):
-    st.session_state.sex = sex
-    st.session_state.values = PARAMS[sex]["defaults"].copy()
 
 ensure_state()
 
 sex = st.session_state.sex
+model = st.session_state.model
 p = PARAMS[sex]
 vals = st.session_state.values
-
-
 
 left, right = st.columns([0.9, 2.1], gap="large")
 
@@ -170,35 +269,82 @@ with left:
     st.markdown('<div class="panel-card">', unsafe_allow_html=True)
     st.markdown("## Input panel")
     st.caption("Interactive")
+
     c1, c2 = st.columns(2)
     with c1:
-        chosen_sex = st.selectbox("SEX", ["Female", "Male"], index=0 if sex=="Female" else 1)
+        chosen_sex = st.selectbox(
+            "SEX",
+            ["Female", "Male"],
+            index=0 if sex == "Female" else 1,
+        )
     with c2:
-        model = st.selectbox("MODEL", ["Model 2"], index=0)
+        chosen_model = st.selectbox("MODEL", ["Model 2"], index=0)
+
     if chosen_sex != st.session_state.sex:
         load_case(chosen_sex)
         st.rerun()
 
+    st.session_state.model = chosen_model
+    sex = st.session_state.sex
+    model = st.session_state.model
+    p = PARAMS[sex]
+    vals = sanitize_values(st.session_state.values, sex)
+
     st.markdown('<div class="smallcap" style="margin-top:0.8rem">Core inputs</div>', unsafe_allow_html=True)
     a, b = st.columns(2)
+
     with a:
-        vals["age"] = num_input_block("AGE", "years", vals["age"], *p["ranges"]["age"], 1.0, 0)
-        vals["rbc"] = num_input_block("RBC", "×10¹²/L", vals["rbc"], *p["ranges"]["rbc"], 0.01, 2)
+        vals["age"] = num_input_block(
+            "age", "AGE", "years", vals.get("age", p["defaults"]["age"]),
+            *p["ranges"]["age"], 1.0, 0
+        )
+        vals["rbc"] = num_input_block(
+            "rbc", "RBC", "×10¹²/L", vals.get("rbc", p["defaults"]["rbc"]),
+            *p["ranges"]["rbc"], 0.01, 2
+        )
+
     with b:
-        vals["wbc"] = num_input_block("WBC", "×10⁹/L", vals["wbc"], *p["ranges"]["wbc"], 0.01, 2)
-        vals["hrr"] = num_input_block("HRR", "ratio", vals["hrr"], *p["ranges"]["hrr"], 0.01, 2)
+        vals["wbc"] = num_input_block(
+            "wbc", "WBC", "×10⁹/L", vals.get("wbc", p["defaults"]["wbc"]),
+            *p["ranges"]["wbc"], 0.01, 2
+        )
+        vals["hrr"] = num_input_block(
+            "hrr", "HRR", "ratio", vals.get("hrr", p["defaults"]["hrr"]),
+            *p["ranges"]["hrr"], 0.01, 2
+        )
 
     st.markdown('<div class="smallcap" style="margin-top:0.8rem">Additional inputs</div>', unsafe_allow_html=True)
     c3, c4 = st.columns(2)
+
     with c3:
         st.markdown('<div class="smallcap">BMI</div>', unsafe_allow_html=True)
-        vals["bmi"] = st.number_input("BMI", min_value=10.0, max_value=60.0, value=float(vals["bmi"]), step=0.1, label_visibility="collapsed")
+        vals["bmi"] = st.number_input(
+            "BMI",
+            min_value=10.0,
+            max_value=60.0,
+            value=float(vals.get("bmi", p["defaults"]["bmi"])),
+            step=0.1,
+            label_visibility="collapsed",
+        )
         st.caption("kg/m²")
+
     with c4:
         st.markdown('<div class="smallcap">SBP</div>', unsafe_allow_html=True)
-        vals["sbp"] = st.number_input("SBP", min_value=60.0, max_value=260.0, value=float(vals["sbp"]), step=1.0, label_visibility="collapsed")
+        vals["sbp"] = st.number_input(
+            "SBP",
+            min_value=60.0,
+            max_value=260.0,
+            value=float(vals.get("sbp", p["defaults"]["sbp"])),
+            step=1.0,
+            label_visibility="collapsed",
+        )
         st.caption("mmHg")
-    vals["smoking"] = st.selectbox("SMOKING", ["No", "Yes"], index=0 if vals["smoking"]=="No" else 1)
+
+    vals["smoking"] = st.selectbox(
+        "SMOKING",
+        ["No", "Yes"],
+        index=0 if vals.get("smoking", "No") == "No" else 1,
+    )
 
     b1, b2, b3 = st.columns(3)
     with b1:
@@ -225,6 +371,7 @@ with left:
     st.markdown("</div>", unsafe_allow_html=True)
 
 st.session_state.values = vals
+
 z, contrib, lp, rh, risk, risk_index = calc(vals, p)
 profile, profile_desc, profile_bg, profile_fg = risk_profile(risk)
 
@@ -236,6 +383,7 @@ with right:
         (k3, "linear-gradient(90deg,#10b981,#84cc16)", "5-year risk", f"{risk*100:.2f}%", "Absolute risk estimate"),
         (k4, "linear-gradient(90deg,#f59e0b,#f97316)", "Risk profile", profile, "Output label for interface display"),
     ]
+
     for col, grad, title, value, desc in kpis:
         with col:
             st.markdown(f'''
@@ -255,11 +403,13 @@ with right:
             st.markdown('<div class="panel-card">', unsafe_allow_html=True)
             st.markdown(f"### Risk profile &nbsp;&nbsp;<span class='badge'>{sex} · {model}</span>", unsafe_allow_html=True)
             st.markdown('<div class="smallcap" style="margin-top:1rem">Relative hazard scale</div>', unsafe_allow_html=True)
+
             width_pct = max(2, min(100, risk_index))
             st.markdown(f'''
             <div class="profile-bar-bg"><div class="profile-bar-fill" style="width:{width_pct}%"></div></div>
             <div style="display:flex;justify-content:space-between;margin-top:0.45rem;color:#64748b;font-size:0.88rem"><span>Lower</span><span>Higher</span></div>
             ''', unsafe_allow_html=True)
+
             st.markdown(
                 '''
                 <div class="soft-card" style="margin-top:1rem; font-size:1rem; line-height:1.8; color:#475569;">
@@ -268,6 +418,7 @@ with right:
                 ''',
                 unsafe_allow_html=True,
             )
+
             st.markdown("#### Active variables")
             c3, c4 = st.columns(2)
             cards = [
@@ -286,6 +437,7 @@ with right:
                     </div>
                     ''', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
+
         with c2:
             st.markdown('<div class="panel-card">', unsafe_allow_html=True)
             st.markdown("### Summary")
@@ -297,7 +449,11 @@ with right:
                 ("5-year risk", f"{risk*100:.2f}%"),
             ]
             for k, v in summary_rows:
-                st.markdown(f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v}</span></div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v}</span></div>',
+                    unsafe_allow_html=True,
+                )
+
             st.markdown(f'''
             <div style="border-radius:16px;padding:0.95rem 1rem;background:{profile_bg};color:{profile_fg};border:1px solid #e2e8f0">
               <div style="font-weight:700">{profile}</div>
@@ -312,6 +468,7 @@ with right:
             st.markdown('<div class="panel-card">', unsafe_allow_html=True)
             st.markdown("### Variable contribution")
             st.caption("Current-input contribution to the model linear predictor")
+
             display = [
                 ("Age", contrib["age"], "#3b82f6", "#8b5cf6"),
                 ("WBC", contrib["wbc"], "#06b6d4", "#2563eb"),
@@ -319,6 +476,7 @@ with right:
                 ("HRR", contrib["hrr"], "#ec4899", "#f43f5e"),
             ]
             max_abs = max(abs(x[1]) for x in display) if display else 1.0
+
             for label, val, c_from, c_to in display:
                 width = max(3, abs(val) / max_abs * 100)
                 direction = "Upward" if val >= 0 else "Downward"
@@ -337,6 +495,7 @@ with right:
                 </div>
                 ''', unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
+
         with c2:
             st.markdown('<div class="panel-card">', unsafe_allow_html=True)
             st.markdown("### How to read variable contribution")
@@ -371,6 +530,7 @@ with right:
             - Designed for complementary risk assessment when routine CBC markers are already available in structured electronic health records
             ''')
             st.markdown("</div>", unsafe_allow_html=True)
+
         with c2:
             st.markdown('<div class="panel-card">', unsafe_allow_html=True)
             st.markdown("### Model coefficients")
@@ -381,7 +541,10 @@ with right:
                 ("β(WBC)", p["beta"]["wbc"]),
                 ("S0(5)", p["S0"]),
             ]:
-                st.markdown(f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v:.4f}</span></div>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v:.4f}</span></div>',
+                    unsafe_allow_html=True,
+                )
             st.markdown("</div>", unsafe_allow_html=True)
 
     with tab4:
