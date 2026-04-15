@@ -10,10 +10,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# =========================
-# Parameters from thesis / current app package
-# =========================
-
 WHO_EAST_ASIA = {
     "Female": {
         "chd": {
@@ -66,8 +62,6 @@ WHO_RECAL = {
     "Male": {"alpha": 0.9976, "beta": 1.3730},
 }
 
-# Model 2 exact coefficients + baseline survival from thesis.
-# WBC and HRR mean/SD are temporary approximations: mean ~= median, sd ~= IQR/1.349.
 MODEL2 = {
     "Female": {
         "s0_5y": 0.978,
@@ -83,9 +77,6 @@ MODEL2 = {
     },
 }
 
-# Model 3 coefficients from thesis.
-# IMPORTANT: exact 5-year baseline survival for Model 3 is NOT in the uploaded thesis tables.
-# Leave as None until the exact female/male S0(5) is supplied from the saved Cox model.
 MODEL3 = {
     "Female": {
         "s0_5y": 0.978,
@@ -132,86 +123,153 @@ DEFAULT_CASES = {
     "Male": {"age": 58.0, "rbc": 4.72, "wbc": 6.80, "hrr": 11.61, "bmi": 23.3, "sbp": 131.0, "smoking": "No"},
 }
 
-TECH_NOTE = "Model 2 uses exact thesis coefficients and baseline survival. WBC/HRR mean and SD are temporary approximations inherited from the current deployment package. Model 3 coefficients are ready, but exact 5-year baseline survival still needs to be filled in from the saved Cox output before absolute risk can be shown."
-
-# =========================
-# Helpers
-# =========================
-
 
 def css() -> None:
     st.markdown(
         """
 <style>
+:root {
+    --bg: #f6f8fc;
+    --card: #ffffff;
+    --soft: #f8fafc;
+    --border: #dbe3ef;
+    --text: #0f172a;
+    --muted: #64748b;
+    --shadow: 0 10px 28px rgba(15, 23, 42, 0.05);
+}
+html, body, [data-testid="stAppViewContainer"] {
+    background: var(--bg);
+}
+header[data-testid="stHeader"] {
+    background: rgba(0,0,0,0);
+}
 .block-container {
     max-width: 1320px;
-    padding-top: 1.1rem;
+    padding-top: 1.3rem;
     padding-bottom: 2rem;
 }
-.card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    padding: 1rem 1.1rem;
-    box-shadow: 0 8px 26px rgba(15,23,42,0.05);
+h1 {
+    letter-spacing: -0.02em;
 }
-.card-soft {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+.card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 1.15rem 1.15rem 1.2rem 1.15rem;
+    box-shadow: var(--shadow);
+}
+.soft-card {
+    background: var(--soft);
+    border: 1px solid var(--border);
     border-radius: 18px;
     padding: 0.95rem 1rem;
 }
+.result-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 1rem 1rem 1rem 1rem;
+    box-shadow: var(--shadow);
+    min-height: 210px;
+}
 .smallcap {
-    font-size: 0.72rem;
+    color: var(--muted);
     text-transform: uppercase;
-    letter-spacing: 0.15em;
-    color: #64748b;
+    letter-spacing: 0.16em;
+    font-size: 0.72rem;
+}
+.model-name {
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 0.2rem;
+}
+.model-sub {
+    color: var(--muted);
+    font-size: 0.88rem;
+    margin-top: 0.12rem;
 }
 .big-number {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #0f172a;
+    color: var(--text);
+    font-size: 2.25rem;
+    font-weight: 750;
+    line-height: 1.05;
+    margin-top: 1rem;
 }
-.result-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 22px;
-    padding: 1rem 1rem 1.1rem 1rem;
-    box-shadow: 0 10px 30px rgba(15,23,42,0.05);
-    min-height: 215px;
-}
-.tag {
+.badge {
     display: inline-block;
     border-radius: 999px;
-    padding: 0.22rem 0.68rem;
+    padding: 0.24rem 0.7rem;
     font-size: 0.78rem;
-    font-weight: 600;
-    border: 1px solid #e2e8f0;
+    font-weight: 650;
+    border: 1px solid transparent;
+}
+.badge-low { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+.badge-borderline { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+.badge-high { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+.badge-na { color: #475569; background: #eef2f7; border-color: #d6dee9; }
+.note {
+    color: #425466;
+    font-size: 0.94rem;
+    line-height: 1.68;
+}
+.note-tight {
+    color: #5b6b7f;
+    font-size: 0.87rem;
+    line-height: 1.55;
+}
+.divider {
+    height: 1px;
+    background: #e8edf5;
+    margin-top: 0.8rem;
+    margin-bottom: 0.8rem;
+}
+.case-line {
+    color: #3b4a5c;
+    font-size: 0.93rem;
+    line-height: 1.6;
+}
+.metric-hint {
+    color: var(--muted);
+    font-size: 0.85rem;
+    margin-top: 0.55rem;
+}
+.stButton > button {
+    width: 100%;
+    border-radius: 12px;
+    border: 1px solid #d4dce8;
+    background: #ffffff;
+    color: #0f172a;
+    font-weight: 650;
+    min-height: 44px;
+}
+.stButton > button:hover {
+    border-color: #b7c4d7;
+    background: #f8fafc;
+}
+[data-baseweb="select"] > div,
+div[data-baseweb="input"] > div {
+    border-radius: 12px !important;
+    border-color: #d8e0ec !important;
+    background: #f8fafc !important;
+}
+[data-baseweb="select"] input,
+div[data-baseweb="input"] input {
+    color: #0f172a !important;
+}
+div[data-testid="stNumberInputStepDown"],
+div[data-testid="stNumberInputStepUp"] {
+    background: transparent !important;
+}
+div[data-testid="stExpander"] {
+    border: 1px solid var(--border);
+    border-radius: 18px;
     background: #ffffff;
 }
-.tag-low { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
-.tag-borderline { color: #92400e; background: #fef3c7; border-color: #fde68a; }
-.tag-high { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
-.tag-na { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
-.note {
-    font-size: 0.92rem;
-    color: #475569;
-    line-height: 1.7;
-}
-hr { margin-top: 0.8rem; margin-bottom: 0.8rem; }
 </style>
 """,
         unsafe_allow_html=True,
     )
-
-
-def safe_num(x: Optional[float]) -> Optional[float]:
-    if x is None:
-        return None
-    try:
-        return float(x)
-    except (TypeError, ValueError):
-        return None
 
 
 def clamp(x: float, lo: float, hi: float) -> float:
@@ -227,30 +285,15 @@ def expit(x: float) -> float:
     return 1.0 / (1.0 + math.exp(-x))
 
 
-def classify_risk(p: Optional[float]) -> Tuple[str, str]:
-    if p is None:
-        return ("N/A", "tag-na")
-    pct = p * 100
+def classify_risk(risk: Optional[float]) -> Tuple[str, str]:
+    if risk is None:
+        return "Unavailable", "badge-na"
+    pct = risk * 100
     if pct < 2.5:
-        return ("Low", "tag-low")
+        return "Low", "badge-low"
     if pct < 5.0:
-        return ("Borderline", "tag-borderline")
-    return ("High", "tag-high")
-
-
-def consensus_label(model_labels: List[str]) -> str:
-    usable = [x for x in model_labels if x in {"Low", "Borderline", "High"}]
-    if not usable:
-        return "No result"
-    high_n = sum(x == "High" for x in usable)
-    borderline_n = sum(x == "Borderline" for x in usable)
-    if high_n >= 2 or (high_n == 1 and len(usable) == 1):
-        return "High"
-    if borderline_n == len(usable):
-        return "Borderline"
-    if borderline_n >= 1:
-        return "Borderline"
-    return "Low"
+        return "Borderline", "badge-borderline"
+    return "High", "badge-high"
 
 
 def smoking_value(smoking: str) -> Optional[int]:
@@ -263,24 +306,22 @@ def smoking_value(smoking: str) -> Optional[int]:
 
 def num_input(label: str, key: str, value: float, min_v: float, max_v: float, step: float, unit: str, digits: int = 2) -> float:
     st.markdown(f'<div class="smallcap">{label}</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns([1.0, 0.72])
-    with col1:
-        val = st.number_input(
-            key,
+    c1, c2 = st.columns([1.0, 0.66])
+    with c1:
+        out = st.number_input(
+            label,
             min_value=float(min_v),
             max_value=float(max_v),
             value=float(value),
             step=float(step),
             label_visibility="collapsed",
         )
-    with col2:
-        st.markdown(f"<div style='padding-top:0.55rem;color:#64748b;font-size:0.88rem'>{unit}</div>", unsafe_allow_html=True)
-    return round(float(val), digits)
-
-
-# =========================
-# Risk calculation
-# =========================
+    with c2:
+        st.markdown(
+            f"<div style='padding-top:0.52rem;color:#64748b;font-size:0.88rem'>{unit}</div>",
+            unsafe_allow_html=True,
+        )
+    return round(float(out), digits)
 
 
 def who_raw_10y(sex: str, age: float, bmi: float, sbp: float, smoking: int) -> float:
@@ -309,10 +350,10 @@ def who_raw_10y(sex: str, age: float, bmi: float, sbp: float, smoking: int) -> f
 
 def who_recalibrated_5y(sex: str, age: Optional[float], bmi: Optional[float], sbp: Optional[float], smoking: Optional[str]) -> Tuple[Optional[float], str]:
     if age is None or bmi is None or sbp is None or smoking is None:
-        return None, "Missing required inputs"
+        return None, "Missing required input"
     smk = smoking_value(smoking)
     if smk is None:
-        return None, "Smoking is unknown"
+        return None, "Smoking status required"
     raw10 = who_raw_10y(sex, age, bmi, sbp, smk)
     raw5 = 1.0 - ((1.0 - raw10) ** 0.5)
     alpha = WHO_RECAL[sex]["alpha"]
@@ -321,34 +362,92 @@ def who_recalibrated_5y(sex: str, age: Optional[float], bmi: Optional[float], sb
     return recal, "Available"
 
 
-def cox_risk_from_standardized_model(values: Dict[str, Optional[float]], cfg: Dict, required: List[str], smoking_key: bool = False) -> Tuple[Optional[float], str]:
+def cox_risk(values: Dict[str, Optional[float]], cfg: Dict, required: List[str], smoking_key: bool = False) -> Tuple[Optional[float], str]:
     if cfg.get("s0_5y") is None:
-        return None, "Exact baseline survival not configured"
+        return None, "Not configured"
 
-    beta = cfg["beta"]
-    mu = cfg["mu"]
-    sd = cfg["sd"]
     lp = 0.0
-
     for key in required:
         if values.get(key) is None:
             return None, f"Missing {key.upper()}"
-        z = (float(values[key]) - mu[key]) / sd[key]
-        lp += beta[key] * z
+        z = (float(values[key]) - cfg["mu"][key]) / cfg["sd"][key]
+        lp += cfg["beta"][key] * z
 
     if smoking_key:
         smk = smoking_value(values.get("smoking"))
         if smk is None:
-            return None, "Smoking is unknown"
-        lp += beta["smoking"] * smk
+            return None, "Smoking status required"
+        lp += cfg["beta"]["smoking"] * smk
 
     risk = 1.0 - (cfg["s0_5y"] ** math.exp(lp))
     return risk, "Available"
 
 
-# =========================
-# UI
-# =========================
+def concordance_text(labels: List[str]) -> Tuple[str, str, str]:
+    usable = [x for x in labels if x in {"Low", "Borderline", "High"}]
+    if not usable:
+        return "No model output available", "0/3 available", "Enter all required inputs to generate model output."
+
+    high_n = sum(x == "High" for x in usable)
+    border_n = sum(x == "Borderline" for x in usable)
+    low_n = sum(x == "Low" for x in usable)
+    available_n = len(usable)
+
+    if high_n == available_n:
+        return (
+            "All available models indicate elevated 5-year risk.",
+            f"Concordance: {high_n}/{available_n} high",
+            "This pattern supports follow-up risk assessment in a structured EHR workflow.",
+        )
+    if high_n >= 2:
+        return (
+            "Most available models indicate elevated 5-year risk.",
+            f"Concordance: {high_n}/{available_n} high",
+            "The combined pattern is more informative than any single model viewed in isolation.",
+        )
+    if border_n == available_n:
+        return (
+            "Available models consistently indicate borderline 5-year risk.",
+            f"Concordance: {border_n}/{available_n} borderline",
+            "Review in context rather than relying on a single threshold alone.",
+        )
+    if low_n == available_n:
+        return (
+            "Available models consistently indicate lower 5-year risk.",
+            f"Concordance: {low_n}/{available_n} low",
+            "This tool is complementary and should still be interpreted alongside clinical context.",
+        )
+    return (
+        "Model outputs are directionally mixed.",
+        f"Concordance: mixed ({available_n}/3 available)",
+        "When outputs diverge, use the overall pattern as a complementary signal rather than selecting one model only.",
+    )
+
+
+def result_card(title: str, subtitle: str, descriptor: str, risk: Optional[float], status: str) -> str:
+    label, badge_cls = classify_risk(risk)
+    if risk is None:
+        return f'''
+        <div class="result-card">
+          <div class="smallcap">{title}</div>
+          <div class="model-name">{subtitle}</div>
+          <div class="model-sub">{descriptor}</div>
+          <div class="big-number" style="font-size:1.65rem">Unavailable</div>
+          <div style="margin-top:0.45rem"><span class="badge {badge_cls}">{label}</span></div>
+          <div class="divider"></div>
+          <div class="note-tight">{status}</div>
+        </div>
+        '''
+    return f'''
+    <div class="result-card">
+      <div class="smallcap">{title}</div>
+      <div class="model-name">{subtitle}</div>
+      <div class="model-sub">{descriptor}</div>
+      <div class="big-number">{risk*100:.2f}%</div>
+      <div style="margin-top:0.45rem"><span class="badge {badge_cls}">{label}</span></div>
+    </div>
+    '''
+
 
 css()
 
@@ -364,14 +463,14 @@ def load_case(sex: str) -> None:
 
 
 st.title("Complementary 5-Year Cardiovascular Risk Assessment")
-st.caption("WHO + CBC-based Cox models for an EHR-oriented, complementary screening workflow")
+st.caption("WHO and CBC-based Cox models for EHR-oriented complementary risk assessment")
 
-left, right = st.columns([1.0, 1.65], gap="large")
+left, right = st.columns([1.0, 1.68], gap="large")
 
 with left:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### Current case")
-    st.markdown('<div class="smallcap">Patient profile</div>', unsafe_allow_html=True)
+    st.markdown("### Patient profile")
+    st.markdown('<div class="smallcap">Current input</div>', unsafe_allow_html=True)
 
     sex = st.selectbox("Sex", ["Female", "Male"], index=0 if st.session_state.sex == "Female" else 1)
     if sex != st.session_state.sex:
@@ -401,40 +500,44 @@ with left:
         "Smoking",
         ["No", "Yes", "Unknown"],
         index=["No", "Yes", "Unknown"].index(case.get("smoking", "No")),
-        help="WHO and Model 3 require smoking status. Model 2 does not.",
+        help="WHO and Model 3 require smoking status. Model 2 can still be used when smoking is unknown.",
     )
 
-    m1, m2, m3 = st.columns(3)
-    with m1:
-        if st.button("Female example", use_container_width=True):
+    b1, b2, b3 = st.columns(3)
+    with b1:
+        if st.button("Female demo"):
             load_case("Female")
             st.rerun()
-    with m2:
-        if st.button("Male example", use_container_width=True):
+    with b2:
+        if st.button("Male demo"):
             load_case("Male")
             st.rerun()
-    with m3:
-        if st.button("Reset", type="primary", use_container_width=True):
+    with b3:
+        if st.button("Reset"):
             load_case(st.session_state.sex)
             st.rerun()
 
     st.session_state.case = case
 
-    smoking_txt = "current smoking" if case["smoking"] == "Yes" else ("non-smoking" if case["smoking"] == "No" else "smoking status unavailable")
+    smoking_txt = {
+        "Yes": "Current smoking",
+        "No": "Non-smoking",
+        "Unknown": "Smoking unavailable",
+    }[case["smoking"]]
+
     st.markdown(
         f'''
-        <div class="card-soft" style="margin-top:0.9rem">
+        <div class="soft-card" style="margin-top:0.9rem">
           <div class="smallcap">Case summary</div>
-          <div class="note">
-            {sex}, {int(case['age'])} years; RBC {case['rbc']:.2f} ×10¹²/L; WBC {case['wbc']:.2f} ×10⁹/L; HRR {case['hrr']:.2f}; BMI {case['bmi']:.1f} kg/m²; SBP {case['sbp']:.0f} mmHg; {smoking_txt}.
-          </div>
+          <div class="case-line"><b>{sex}</b>, {int(case['age'])} y</div>
+          <div class="case-line">RBC {case['rbc']:.2f} ×10¹²/L &nbsp;|&nbsp; WBC {case['wbc']:.2f} ×10⁹/L &nbsp;|&nbsp; HRR {case['hrr']:.2f}</div>
+          <div class="case-line">BMI {case['bmi']:.1f} kg/m² &nbsp;|&nbsp; SBP {case['sbp']:.0f} mmHg &nbsp;|&nbsp; {smoking_txt}</div>
         </div>
         ''',
         unsafe_allow_html=True,
     )
     st.markdown('</div>', unsafe_allow_html=True)
 
-# calculations
 values = {
     "age": clamp(case["age"], *RANGES["age"]),
     "rbc": clamp(case["rbc"], *(RANGES["rbc_female"] if sex == "Female" else RANGES["rbc_male"])),
@@ -446,103 +549,73 @@ values = {
 }
 
 who_risk, who_status = who_recalibrated_5y(sex, values["age"], values["bmi"], values["sbp"], values["smoking"])
-model2_risk, model2_status = cox_risk_from_standardized_model(values, MODEL2[sex], ["age", "hrr", "rbc", "wbc"])
-model3_risk, model3_status = cox_risk_from_standardized_model(values, MODEL3[sex], ["age", "bmi", "sbp", "hrr", "rbc", "wbc"], smoking_key=True)
+model2_risk, model2_status = cox_risk(values, MODEL2[sex], ["age", "hrr", "rbc", "wbc"])
+model3_risk, model3_status = cox_risk(values, MODEL3[sex], ["age", "bmi", "sbp", "hrr", "rbc", "wbc"], smoking_key=True)
 
-results = [
-    {
-        "title": "WHO",
-        "subtitle": "Recalibrated WHO East Asia, 5-year risk",
-        "risk": who_risk,
-        "status": who_status,
-        "inputs": "Age, smoking, BMI, SBP",
-    },
-    {
-        "title": "Model 2 (Cox)",
-        "subtitle": "Primary CBC model",
-        "risk": model2_risk,
-        "status": model2_status,
-        "inputs": "Age, WBC, RBC, HRR",
-    },
-    {
-        "title": "Model 3 (Cox)",
-        "subtitle": "Integrated model",
-        "risk": model3_risk,
-        "status": model3_status,
-        "inputs": "Age, smoking, BMI, SBP, WBC, RBC, HRR",
-    },
-]
-
-labels = [classify_risk(r["risk"])[0] for r in results]
-final_label = consensus_label(labels)
+labels = [classify_risk(x)[0] for x in [who_risk, model2_risk, model3_risk]]
+interp_title, interp_tag, interp_body = concordance_text(labels)
 
 with right:
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown("### Risk results")
-    st.markdown('<div class="smallcap">Three-model comparison</div>', unsafe_allow_html=True)
+    st.markdown("### Three-model risk results")
+    st.markdown('<div class="smallcap">5-year absolute risk</div>', unsafe_allow_html=True)
 
-    r1, r2, r3 = st.columns(3)
-    for col, item in zip([r1, r2, r3], results):
-        label, tag_cls = classify_risk(item["risk"])
-        risk_text = f"{item['risk']*100:.2f}%" if item["risk"] is not None else "—"
-        with col:
-            st.markdown(
-                f'''
-                <div class="result-card">
-                  <div class="smallcap">{item['title']}</div>
-                  <div style="font-size:1rem;font-weight:700;color:#0f172a;margin-top:0.2rem">{item['subtitle']}</div>
-                  <div class="big-number" style="margin-top:0.85rem">{risk_text}</div>
-                  <div style="margin-top:0.4rem"><span class="tag {tag_cls}">{label}</span></div>
-                  <hr>
-                  <div class="note"><b>Inputs:</b> {item['inputs']}</div>
-                  <div class="note" style="margin-top:0.45rem"><b>Status:</b> {item['status']}</div>
-                </div>
-                ''',
-                unsafe_allow_html=True,
-            )
+    r1, r2, r3 = st.columns(3, gap="medium")
+    with r1:
+        st.markdown(
+            result_card(
+                "WHO",
+                "WHO (recalibrated)",
+                "Age + smoking + BMI + SBP",
+                who_risk,
+                who_status,
+            ),
+            unsafe_allow_html=True,
+        )
+    with r2:
+        st.markdown(
+            result_card(
+                "Model 2 (Cox)",
+                "Primary CBC model",
+                "Age + WBC + RBC + HRR",
+                model2_risk,
+                model2_status,
+            ),
+            unsafe_allow_html=True,
+        )
+    with r3:
+        st.markdown(
+            result_card(
+                "Model 3 (Cox)",
+                "Integrated model",
+                "Age + smoking + BMI + SBP + WBC + RBC + HRR",
+                model3_risk,
+                model3_status,
+            ),
+            unsafe_allow_html=True,
+        )
 
-    overall_tag_cls = {"Low": "tag-low", "Borderline": "tag-borderline", "High": "tag-high", "No result": "tag-na"}.get(final_label, "tag-na")
     st.markdown(
         f'''
-        <div class="card-soft" style="margin-top:1rem">
-          <div class="smallcap">Suggested reading</div>
-          <div style="margin-top:0.35rem"><span class="tag {overall_tag_cls}">Consensus: {final_label}</span></div>
-          <div class="note" style="margin-top:0.55rem">
-            This summary is designed for complementary use in structured EHR workflows. It does not replace clinician judgement. When multiple models are available, the combined pattern is more informative than any single score alone.
-          </div>
+        <div class="soft-card" style="margin-top:1rem">
+          <div class="smallcap">Clinical interpretation</div>
+          <div class="model-name" style="margin-top:0.3rem">{interp_title}</div>
+          <div style="margin-top:0.4rem"><span class="badge badge-na">{interp_tag}</span></div>
+          <div class="note" style="margin-top:0.6rem">{interp_body}</div>
+          <div class="metric-hint">Risk bands used on this page: low &lt; 2.5%, borderline 2.5% to &lt; 5.0%, high ≥ 5.0%.</div>
         </div>
         ''',
         unsafe_allow_html=True,
     )
-
     st.markdown('</div>', unsafe_allow_html=True)
 
-    a, b = st.columns([1.05, 0.95], gap="large")
-    with a:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### How to use this page")
+    with st.expander("About this tool"):
         st.markdown(
             """
-1. Enter the currently available examination data.
-2. Review all model outputs side by side rather than selecting only one model.
-3. If BMI, SBP, or smoking status is unavailable, WHO and Model 3 may be unavailable, but Model 2 can still be used.
-4. Use the result as a complementary screening signal for follow-up assessment inside the EHR workflow.
-"""
-        )
-        st.markdown('</div>', unsafe_allow_html=True)
-    with b:
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown("### Technical note")
-        st.markdown(TECH_NOTE)
-        st.markdown('</div>', unsafe_allow_html=True)
+This page is designed for complementary risk assessment in a structured EHR workflow.
 
-    st.markdown('<div class="card" style="margin-top:1rem">', unsafe_allow_html=True)
-    st.markdown("### Design rationale")
-    st.markdown(
-        """
-- The page shows WHO, Model 2, and Model 3 together.
-- Coefficients, intermediate linear predictors, and variable-contribution panels are intentionally removed from the main interface.
-- The emphasis is on risk output, availability of each model, and a workflow-compatible comparison that can later be embedded into an EHR system.
-"""
-    )
-    st.markdown('</div>', unsafe_allow_html=True)
+- It shows WHO, Model 2, and Model 3 side by side.
+- It emphasizes final risk output rather than formulas or intermediate predictors.
+- It does not replace clinician judgement or formal diagnostic evaluation.
+            """
+        )
