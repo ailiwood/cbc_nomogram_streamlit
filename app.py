@@ -1,575 +1,548 @@
 import math
+from typing import Dict, Optional, Tuple, List
+
 import streamlit as st
 
 st.set_page_config(
-    page_title="CBC-Based CVD Risk Assessment",
+    page_title="Complementary 5-Year CVD Risk Assessment",
     page_icon="🫀",
     layout="wide",
     initial_sidebar_state="collapsed",
 )
 
-st.markdown("""
-<style>
-.block-container {
-    padding-top: 1.2rem;
-    padding-bottom: 1.2rem;
-    max-width: 1400px;
-}
-[data-testid="stMetricValue"] {
-    font-size: 2rem;
-}
-.smallcap {
-    font-size: 0.72rem;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-    color: #64748b;
-}
-.panel-card {
-    background: rgba(255,255,255,0.92);
-    border: 1px solid #e2e8f0;
-    border-radius: 22px;
-    padding: 1rem 1rem 1.1rem 1rem;
-    box-shadow: 0 10px 30px rgba(15,23,42,0.05);
-}
-.soft-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 20px;
-    padding: 1rem;
-}
-.kpi-card {
-    background: white;
-    border-radius: 22px;
-    padding: 1rem 1rem 1.1rem 1rem;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 10px 30px rgba(15,23,42,0.05);
-}
-.kpi-bar {
-    height: 6px;
-    width: 74px;
-    border-radius: 999px;
-    margin-bottom: 0.75rem;
-}
-.profile-bar-bg {
-    height: 16px;
-    border-radius: 999px;
-    background: #e2e8f0;
-    overflow: hidden;
-}
-.profile-bar-fill {
-    height: 16px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 48%, #f43f5e 100%);
-}
-.badge {
-    display: inline-block;
-    border-radius: 999px;
-    padding: 0.3rem 0.75rem;
-    font-size: 0.82rem;
-    border: 1px solid #e2e8f0;
-    background: white;
-}
-.summary-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #f8fafc;
-    border-radius: 16px;
-    padding: 0.95rem 1rem;
-    margin-bottom: 0.7rem;
-}
-</style>
-""", unsafe_allow_html=True)
+# =========================
+# Parameters from thesis / current app package
+# =========================
 
-PARAMS = {
+WHO_EAST_ASIA = {
     "Female": {
-        "label": "Female",
-        "S0": 0.978,
-        "beta": {"age": 1.1177, "hrr": -0.1511, "rbc": -0.0280, "wbc": 0.1182},
-        "mu": {"age": 55.59, "rbc": 4.32, "hrr": 10.31, "wbc": 6.10},
-        "sigma": {"age": 10.10, "rbc": 0.44, "hrr": 1.20, "wbc": 2.00},
-        "ranges": {
-            "age": (40.0, 79.0),
-            "hrr": (7.0, 16.0),
-            "rbc": (3.0, 6.0),
-            "wbc": (2.0, 15.0),
+        "chd": {
+            "age": 0.1049,
+            "bmi": 0.0258,
+            "sbp": 0.0167,
+            "smk": 1.0931,
+            "age_bmi": -0.0007,
+            "age_sbp": -0.0002,
+            "age_smk": -0.0344,
+            "s0_10y": 0.9887,
         },
-        "defaults": {
-            "age": 58.0,
-            "hrr": 10.31,
-            "rbc": 4.42,
-            "wbc": 6.80,
-            "bmi": 24.6,
-            "sbp": 136.0,
-            "smoking": "No",
+        "stroke": {
+            "age": 0.1046,
+            "bmi": 0.0036,
+            "sbp": 0.0217,
+            "smk": 0.7399,
+            "age_bmi": -0.00001,
+            "age_sbp": -0.0005,
+            "age_smk": -0.0204,
+            "s0_10y": 0.9886,
         },
     },
     "Male": {
-        "label": "Male",
-        "S0": 0.972,
-        "beta": {"age": 0.9886, "hrr": -0.0811, "rbc": -0.0501, "wbc": 0.1331},
-        "mu": {"age": 56.39, "rbc": 4.72, "hrr": 11.61, "wbc": 6.80},
-        "sigma": {"age": 10.41, "rbc": 0.55, "hrr": 1.36, "wbc": 2.30},
-        "ranges": {
-            "age": (40.0, 79.0),
-            "hrr": (7.0, 16.0),
-            "rbc": (3.0, 6.5),
-            "wbc": (2.0, 15.0),
+        "chd": {
+            "age": 0.0736,
+            "bmi": 0.0337,
+            "sbp": 0.0134,
+            "smk": 0.5955,
+            "age_bmi": -0.0010,
+            "age_sbp": -0.0002,
+            "age_smk": -0.0201,
+            "s0_10y": 0.9544,
         },
-        "defaults": {
-            "age": 58.0,
-            "hrr": 11.61,
-            "rbc": 4.92,
-            "wbc": 6.80,
-            "bmi": 25.8,
-            "sbp": 136.0,
-            "smoking": "No",
+        "stroke": {
+            "age": 0.0977,
+            "bmi": 0.0160,
+            "sbp": 0.0227,
+            "smk": 0.5000,
+            "age_bmi": -0.0004,
+            "age_sbp": -0.0004,
+            "age_smk": -0.0154,
+            "s0_10y": 0.9848,
         },
     },
 }
 
-REQUIRED_VALUE_KEYS = ["age", "hrr", "rbc", "wbc", "bmi", "sbp", "smoking"]
+WHO_RECAL = {
+    "Female": {"alpha": 1.2174, "beta": 1.0409},
+    "Male": {"alpha": 0.9976, "beta": 1.3730},
+}
+
+# Model 2 exact coefficients + baseline survival from thesis.
+# WBC and HRR mean/SD are temporary approximations: mean ~= median, sd ~= IQR/1.349.
+MODEL2 = {
+    "Female": {
+        "s0_5y": 0.978,
+        "beta": {"age": 1.1177, "hrr": -0.1511, "rbc": -0.0280, "wbc": 0.1182},
+        "mu": {"age": 55.59, "hrr": 10.31, "rbc": 4.32, "wbc": 6.10},
+        "sd": {"age": 10.10, "hrr": 1.201, "rbc": 0.44, "wbc": 2.001},
+    },
+    "Male": {
+        "s0_5y": 0.972,
+        "beta": {"age": 0.9886, "hrr": -0.0811, "rbc": -0.0501, "wbc": 0.1331},
+        "mu": {"age": 56.39, "hrr": 11.61, "rbc": 4.72, "wbc": 6.80},
+        "sd": {"age": 10.41, "hrr": 1.364, "rbc": 0.55, "wbc": 2.298},
+    },
+}
+
+# Model 3 coefficients from thesis.
+# IMPORTANT: exact 5-year baseline survival for Model 3 is NOT in the uploaded thesis tables.
+# Leave as None until the exact female/male S0(5) is supplied from the saved Cox model.
+MODEL3 = {
+    "Female": {
+        "s0_5y": 0.978,
+        "beta": {
+            "age": 1.0988,
+            "smoking": -0.2586,
+            "bmi": 0.0711,
+            "sbp": 0.0949,
+            "hrr": -0.1543,
+            "rbc": -0.0394,
+            "wbc": 0.1136,
+        },
+        "mu": {"age": 55.59, "bmi": 23.12, "sbp": 129.90, "hrr": 10.31, "rbc": 4.32, "wbc": 6.10},
+        "sd": {"age": 10.10, "bmi": 2.99, "sbp": 15.90, "hrr": 1.201, "rbc": 0.44, "wbc": 2.001},
+    },
+    "Male": {
+        "s0_5y": 0.972,
+        "beta": {
+            "age": 0.9658,
+            "smoking": -0.0197,
+            "bmi": -0.0079,
+            "sbp": 0.1057,
+            "hrr": -0.0807,
+            "rbc": -0.0525,
+            "wbc": 0.1313,
+        },
+        "mu": {"age": 56.39, "bmi": 23.32, "sbp": 130.57, "hrr": 11.61, "rbc": 4.72, "wbc": 6.80},
+        "sd": {"age": 10.41, "bmi": 2.76, "sbp": 15.27, "hrr": 1.364, "rbc": 0.55, "wbc": 2.298},
+    },
+}
+
+RANGES = {
+    "age": (40.0, 79.0),
+    "rbc_female": (3.0, 6.0),
+    "rbc_male": (3.0, 6.5),
+    "wbc": (2.0, 15.0),
+    "hrr": (7.0, 16.0),
+    "bmi": (10.0, 60.0),
+    "sbp": (60.0, 260.0),
+}
+
+DEFAULT_CASES = {
+    "Female": {"age": 56.0, "rbc": 4.32, "wbc": 6.10, "hrr": 10.31, "bmi": 23.1, "sbp": 130.0, "smoking": "No"},
+    "Male": {"age": 58.0, "rbc": 4.72, "wbc": 6.80, "hrr": 11.61, "bmi": 23.3, "sbp": 131.0, "smoking": "No"},
+}
+
+TECH_NOTE = "Model 2 uses exact thesis coefficients and baseline survival. WBC/HRR mean and SD are temporary approximations inherited from the current deployment package. Model 3 coefficients are ready, but exact 5-year baseline survival still needs to be filled in from the saved Cox output before absolute risk can be shown."
+
+# =========================
+# Helpers
+# =========================
 
 
-def safe_float(value, fallback):
+def css() -> None:
+    st.markdown(
+        """
+<style>
+.block-container {
+    max-width: 1320px;
+    padding-top: 1.1rem;
+    padding-bottom: 2rem;
+}
+.card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 20px;
+    padding: 1rem 1.1rem;
+    box-shadow: 0 8px 26px rgba(15,23,42,0.05);
+}
+.card-soft {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 18px;
+    padding: 0.95rem 1rem;
+}
+.smallcap {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: #64748b;
+}
+.big-number {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+.result-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 22px;
+    padding: 1rem 1rem 1.1rem 1rem;
+    box-shadow: 0 10px 30px rgba(15,23,42,0.05);
+    min-height: 215px;
+}
+.tag {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 0.22rem 0.68rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+.tag-low { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+.tag-borderline { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+.tag-high { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+.tag-na { color: #475569; background: #f1f5f9; border-color: #cbd5e1; }
+.note {
+    font-size: 0.92rem;
+    color: #475569;
+    line-height: 1.7;
+}
+hr { margin-top: 0.8rem; margin-bottom: 0.8rem; }
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def safe_num(x: Optional[float]) -> Optional[float]:
+    if x is None:
+        return None
     try:
-        return float(value)
+        return float(x)
     except (TypeError, ValueError):
-        return float(fallback)
+        return None
 
 
-def sanitize_values(raw_values, sex):
-    defaults = PARAMS[sex]["defaults"].copy()
-
-    if not isinstance(raw_values, dict):
-        return defaults
-
-    cleaned = defaults.copy()
-    for key in REQUIRED_VALUE_KEYS:
-        if key in raw_values and raw_values[key] is not None:
-            cleaned[key] = raw_values[key]
-
-    # 强制修正类型
-    cleaned["age"] = safe_float(cleaned["age"], defaults["age"])
-    cleaned["hrr"] = safe_float(cleaned["hrr"], defaults["hrr"])
-    cleaned["rbc"] = safe_float(cleaned["rbc"], defaults["rbc"])
-    cleaned["wbc"] = safe_float(cleaned["wbc"], defaults["wbc"])
-    cleaned["bmi"] = safe_float(cleaned["bmi"], defaults["bmi"])
-    cleaned["sbp"] = safe_float(cleaned["sbp"], defaults["sbp"])
-    cleaned["smoking"] = "Yes" if str(cleaned["smoking"]) == "Yes" else "No"
-
-    # 核心变量按范围裁剪
-    for key in ["age", "hrr", "rbc", "wbc"]:
-        lo, hi = PARAMS[sex]["ranges"][key]
-        cleaned[key] = max(lo, min(hi, cleaned[key]))
-
-    return cleaned
+def clamp(x: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, float(x)))
 
 
-def ensure_state():
-    sex = st.session_state.get("sex", "Female")
-    if sex not in PARAMS:
-        sex = "Female"
-    st.session_state.sex = sex
-
-    values = st.session_state.get("values", None)
-    st.session_state.values = sanitize_values(values, sex)
-
-    model = st.session_state.get("model", "Model 2")
-    if model != "Model 2":
-        model = "Model 2"
-    st.session_state.model = model
+def logit(p: float) -> float:
+    p = min(max(p, 1e-9), 1 - 1e-9)
+    return math.log(p / (1 - p))
 
 
-def load_case(sex):
-    st.session_state.sex = sex
-    st.session_state.values = PARAMS[sex]["defaults"].copy()
-    st.session_state.model = "Model 2"
+def expit(x: float) -> float:
+    return 1.0 / (1.0 + math.exp(-x))
 
 
-def z_score(x, mu, sigma):
-    return (x - mu) / sigma
-
-
-def calc(values, p):
-    z = {
-        "age": z_score(values["age"], p["mu"]["age"], p["sigma"]["age"]),
-        "hrr": z_score(values["hrr"], p["mu"]["hrr"], p["sigma"]["hrr"]),
-        "rbc": z_score(values["rbc"], p["mu"]["rbc"], p["sigma"]["rbc"]),
-        "wbc": z_score(values["wbc"], p["mu"]["wbc"], p["sigma"]["wbc"]),
-    }
-    contrib = {
-        "age": p["beta"]["age"] * z["age"],
-        "hrr": p["beta"]["hrr"] * z["hrr"],
-        "rbc": p["beta"]["rbc"] * z["rbc"],
-        "wbc": p["beta"]["wbc"] * z["wbc"],
-    }
-    lp = sum(contrib.values())
-    relative_hazard = math.exp(lp)
-    risk = 1 - (p["S0"] ** relative_hazard)
-    risk_index = 100 / (1 + math.exp(-lp))
-    return z, contrib, lp, relative_hazard, risk, risk_index
-
-
-def risk_profile(risk):
-    pct = risk * 100
+def classify_risk(p: Optional[float]) -> Tuple[str, str]:
+    if p is None:
+        return ("N/A", "tag-na")
+    pct = p * 100
     if pct < 2.5:
-        return "Low", "Below 2.5% 5-year risk", "#dcfce7", "#166534"
-    elif pct < 5:
-        return "Borderline", "2.5%–4.9% 5-year risk", "#fef3c7", "#92400e"
-    elif pct < 10:
-        return "Intermediate", "5.0%–9.9% 5-year risk", "#ffedd5", "#9a3412"
-    return "Elevated", "10% or higher 5-year risk", "#ffe4e6", "#be123c"
+        return ("Low", "tag-low")
+    if pct < 5.0:
+        return ("Borderline", "tag-borderline")
+    return ("High", "tag-high")
 
 
-def num_input_block(name, label, unit, value, min_v, max_v, step, digits=2):
-    safe_value = safe_float(value, min_v)
-    safe_value = max(min_v, min(max_v, safe_value))
+def consensus_label(model_labels: List[str]) -> str:
+    usable = [x for x in model_labels if x in {"Low", "Borderline", "High"}]
+    if not usable:
+        return "No result"
+    high_n = sum(x == "High" for x in usable)
+    borderline_n = sum(x == "Borderline" for x in usable)
+    if high_n >= 2 or (high_n == 1 and len(usable) == 1):
+        return "High"
+    if borderline_n == len(usable):
+        return "Borderline"
+    if borderline_n >= 1:
+        return "Borderline"
+    return "Low"
 
+
+def smoking_value(smoking: str) -> Optional[int]:
+    if smoking == "Yes":
+        return 1
+    if smoking == "No":
+        return 0
+    return None
+
+
+def num_input(label: str, key: str, value: float, min_v: float, max_v: float, step: float, unit: str, digits: int = 2) -> float:
     st.markdown(f'<div class="smallcap">{label}</div>', unsafe_allow_html=True)
-
-    c1, c2 = st.columns([1.0, 0.75])
-    with c1:
-        number_value = st.number_input(
-            f"{name}_number",
+    col1, col2 = st.columns([1.0, 0.72])
+    with col1:
+        val = st.number_input(
+            key,
             min_value=float(min_v),
             max_value=float(max_v),
-            value=float(safe_value),
+            value=float(value),
             step=float(step),
             label_visibility="collapsed",
         )
-    with c2:
-        st.markdown(
-            f"<div style='padding-top:0.55rem;color:#64748b;font-size:0.88rem'>{unit}</div>",
-            unsafe_allow_html=True,
+    with col2:
+        st.markdown(f"<div style='padding-top:0.55rem;color:#64748b;font-size:0.88rem'>{unit}</div>", unsafe_allow_html=True)
+    return round(float(val), digits)
+
+
+# =========================
+# Risk calculation
+# =========================
+
+
+def who_raw_10y(sex: str, age: float, bmi: float, sbp: float, smoking: int) -> float:
+    p = WHO_EAST_ASIA[sex]
+    age_c = age - 60.0
+    bmi_c = bmi - 25.0
+    sbp_c = sbp - 120.0
+
+    def one_outcome(name: str) -> float:
+        q = p[name]
+        lp = (
+            q["age"] * age_c
+            + q["bmi"] * bmi_c
+            + q["sbp"] * sbp_c
+            + q["smk"] * smoking
+            + q["age_bmi"] * age_c * bmi_c
+            + q["age_sbp"] * age_c * sbp_c
+            + q["age_smk"] * age_c * smoking
         )
+        return 1.0 - (q["s0_10y"] ** math.exp(lp))
 
-    slider_value = st.slider(
-        f"{name}_slider",
-        min_value=float(min_v),
-        max_value=float(max_v),
-        value=float(number_value),
-        step=float(step),
-        label_visibility="collapsed",
-    )
-
-    return round(slider_value, digits)
+    r_chd = one_outcome("chd")
+    r_stroke = one_outcome("stroke")
+    return 1.0 - (1.0 - r_chd) * (1.0 - r_stroke)
 
 
-ensure_state()
+def who_recalibrated_5y(sex: str, age: Optional[float], bmi: Optional[float], sbp: Optional[float], smoking: Optional[str]) -> Tuple[Optional[float], str]:
+    if age is None or bmi is None or sbp is None or smoking is None:
+        return None, "Missing required inputs"
+    smk = smoking_value(smoking)
+    if smk is None:
+        return None, "Smoking is unknown"
+    raw10 = who_raw_10y(sex, age, bmi, sbp, smk)
+    raw5 = 1.0 - ((1.0 - raw10) ** 0.5)
+    alpha = WHO_RECAL[sex]["alpha"]
+    beta = WHO_RECAL[sex]["beta"]
+    recal = expit(alpha + beta * logit(raw5))
+    return recal, "Available"
 
-sex = st.session_state.sex
-model = st.session_state.model
-p = PARAMS[sex]
-vals = st.session_state.values
 
-left, right = st.columns([0.9, 2.1], gap="large")
+def cox_risk_from_standardized_model(values: Dict[str, Optional[float]], cfg: Dict, required: List[str], smoking_key: bool = False) -> Tuple[Optional[float], str]:
+    if cfg.get("s0_5y") is None:
+        return None, "Exact baseline survival not configured"
+
+    beta = cfg["beta"]
+    mu = cfg["mu"]
+    sd = cfg["sd"]
+    lp = 0.0
+
+    for key in required:
+        if values.get(key) is None:
+            return None, f"Missing {key.upper()}"
+        z = (float(values[key]) - mu[key]) / sd[key]
+        lp += beta[key] * z
+
+    if smoking_key:
+        smk = smoking_value(values.get("smoking"))
+        if smk is None:
+            return None, "Smoking is unknown"
+        lp += beta["smoking"] * smk
+
+    risk = 1.0 - (cfg["s0_5y"] ** math.exp(lp))
+    return risk, "Available"
+
+
+# =========================
+# UI
+# =========================
+
+css()
+
+if "sex" not in st.session_state:
+    st.session_state.sex = "Female"
+if "case" not in st.session_state:
+    st.session_state.case = DEFAULT_CASES[st.session_state.sex].copy()
+
+
+def load_case(sex: str) -> None:
+    st.session_state.sex = sex
+    st.session_state.case = DEFAULT_CASES[sex].copy()
+
+
+st.title("Complementary 5-Year Cardiovascular Risk Assessment")
+st.caption("WHO + CBC-based Cox models for an EHR-oriented, complementary screening workflow")
+
+left, right = st.columns([1.0, 1.65], gap="large")
 
 with left:
-    st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-    st.markdown("## Input panel")
-    st.caption("Interactive")
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### Current case")
+    st.markdown('<div class="smallcap">Patient profile</div>', unsafe_allow_html=True)
+
+    sex = st.selectbox("Sex", ["Female", "Male"], index=0 if st.session_state.sex == "Female" else 1)
+    if sex != st.session_state.sex:
+        load_case(sex)
+        st.rerun()
+
+    case = st.session_state.case.copy()
 
     c1, c2 = st.columns(2)
     with c1:
-        chosen_sex = st.selectbox(
-            "SEX",
-            ["Female", "Male"],
-            index=0 if sex == "Female" else 1,
+        case["age"] = num_input("Age", "age_input", case["age"], *RANGES["age"], 1.0, "years", digits=0)
+        case["rbc"] = num_input(
+            "RBC",
+            "rbc_input",
+            case["rbc"],
+            *(RANGES["rbc_female"] if sex == "Female" else RANGES["rbc_male"]),
+            0.01,
+            "×10¹²/L",
         )
+        case["bmi"] = num_input("BMI", "bmi_input", case["bmi"], *RANGES["bmi"], 0.1, "kg/m²")
     with c2:
-        chosen_model = st.selectbox("MODEL", ["Model 2"], index=0)
+        case["wbc"] = num_input("WBC", "wbc_input", case["wbc"], *RANGES["wbc"], 0.01, "×10⁹/L")
+        case["hrr"] = num_input("HRR", "hrr_input", case["hrr"], *RANGES["hrr"], 0.01, "ratio")
+        case["sbp"] = num_input("SBP", "sbp_input", case["sbp"], *RANGES["sbp"], 1.0, "mmHg", digits=0)
 
-    if chosen_sex != st.session_state.sex:
-        load_case(chosen_sex)
-        st.rerun()
-
-    st.session_state.model = chosen_model
-    sex = st.session_state.sex
-    model = st.session_state.model
-    p = PARAMS[sex]
-    vals = sanitize_values(st.session_state.values, sex)
-
-    st.markdown('<div class="smallcap" style="margin-top:0.8rem">Core inputs</div>', unsafe_allow_html=True)
-    a, b = st.columns(2)
-
-    with a:
-        vals["age"] = num_input_block(
-            "age", "AGE", "years", vals.get("age", p["defaults"]["age"]),
-            *p["ranges"]["age"], 1.0, 0
-        )
-        vals["rbc"] = num_input_block(
-            "rbc", "RBC", "×10¹²/L", vals.get("rbc", p["defaults"]["rbc"]),
-            *p["ranges"]["rbc"], 0.01, 2
-        )
-
-    with b:
-        vals["wbc"] = num_input_block(
-            "wbc", "WBC", "×10⁹/L", vals.get("wbc", p["defaults"]["wbc"]),
-            *p["ranges"]["wbc"], 0.01, 2
-        )
-        vals["hrr"] = num_input_block(
-            "hrr", "HRR", "ratio", vals.get("hrr", p["defaults"]["hrr"]),
-            *p["ranges"]["hrr"], 0.01, 2
-        )
-
-    st.markdown('<div class="smallcap" style="margin-top:0.8rem">Additional inputs</div>', unsafe_allow_html=True)
-    c3, c4 = st.columns(2)
-
-    with c3:
-        st.markdown('<div class="smallcap">BMI</div>', unsafe_allow_html=True)
-        vals["bmi"] = st.number_input(
-            "BMI",
-            min_value=10.0,
-            max_value=60.0,
-            value=float(vals.get("bmi", p["defaults"]["bmi"])),
-            step=0.1,
-            label_visibility="collapsed",
-        )
-        st.caption("kg/m²")
-
-    with c4:
-        st.markdown('<div class="smallcap">SBP</div>', unsafe_allow_html=True)
-        vals["sbp"] = st.number_input(
-            "SBP",
-            min_value=60.0,
-            max_value=260.0,
-            value=float(vals.get("sbp", p["defaults"]["sbp"])),
-            step=1.0,
-            label_visibility="collapsed",
-        )
-        st.caption("mmHg")
-
-    vals["smoking"] = st.selectbox(
-        "SMOKING",
-        ["No", "Yes"],
-        index=0 if vals.get("smoking", "No") == "No" else 1,
+    case["smoking"] = st.selectbox(
+        "Smoking",
+        ["No", "Yes", "Unknown"],
+        index=["No", "Yes", "Unknown"].index(case.get("smoking", "No")),
+        help="WHO and Model 3 require smoking status. Model 2 does not.",
     )
 
-    b1, b2, b3 = st.columns(3)
-    with b1:
-        if st.button("Female case", use_container_width=True):
+    m1, m2, m3 = st.columns(3)
+    with m1:
+        if st.button("Female example", use_container_width=True):
             load_case("Female")
             st.rerun()
-    with b2:
-        if st.button("Male case", use_container_width=True):
+    with m2:
+        if st.button("Male example", use_container_width=True):
             load_case("Male")
             st.rerun()
-    with b3:
-        if st.button("Reset", use_container_width=True, type="primary"):
+    with m3:
+        if st.button("Reset", type="primary", use_container_width=True):
             load_case(st.session_state.sex)
             st.rerun()
 
+    st.session_state.case = case
+
+    smoking_txt = "current smoking" if case["smoking"] == "Yes" else ("non-smoking" if case["smoking"] == "No" else "smoking status unavailable")
     st.markdown(
-        '''
-        <div class="soft-card" style="margin-top:1rem; font-size:0.92rem; line-height:1.8; color:#475569;">
-        This interface provides a sex-specific Cox-based complementary cardiovascular risk assessment using age and routine CBC markers available in structured electronic health records.
+        f'''
+        <div class="card-soft" style="margin-top:0.9rem">
+          <div class="smallcap">Case summary</div>
+          <div class="note">
+            {sex}, {int(case['age'])} years; RBC {case['rbc']:.2f} ×10¹²/L; WBC {case['wbc']:.2f} ×10⁹/L; HRR {case['hrr']:.2f}; BMI {case['bmi']:.1f} kg/m²; SBP {case['sbp']:.0f} mmHg; {smoking_txt}.
+          </div>
         </div>
         ''',
         unsafe_allow_html=True,
     )
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-st.session_state.values = vals
+# calculations
+values = {
+    "age": clamp(case["age"], *RANGES["age"]),
+    "rbc": clamp(case["rbc"], *(RANGES["rbc_female"] if sex == "Female" else RANGES["rbc_male"])),
+    "wbc": clamp(case["wbc"], *RANGES["wbc"]),
+    "hrr": clamp(case["hrr"], *RANGES["hrr"]),
+    "bmi": clamp(case["bmi"], *RANGES["bmi"]),
+    "sbp": clamp(case["sbp"], *RANGES["sbp"]),
+    "smoking": case["smoking"],
+}
 
-z, contrib, lp, rh, risk, risk_index = calc(vals, p)
-profile, profile_desc, profile_bg, profile_fg = risk_profile(risk)
+who_risk, who_status = who_recalibrated_5y(sex, values["age"], values["bmi"], values["sbp"], values["smoking"])
+model2_risk, model2_status = cox_risk_from_standardized_model(values, MODEL2[sex], ["age", "hrr", "rbc", "wbc"])
+model3_risk, model3_status = cox_risk_from_standardized_model(values, MODEL3[sex], ["age", "bmi", "sbp", "hrr", "rbc", "wbc"], smoking_key=True)
+
+results = [
+    {
+        "title": "WHO",
+        "subtitle": "Recalibrated WHO East Asia, 5-year risk",
+        "risk": who_risk,
+        "status": who_status,
+        "inputs": "Age, smoking, BMI, SBP",
+    },
+    {
+        "title": "Model 2 (Cox)",
+        "subtitle": "Primary CBC model",
+        "risk": model2_risk,
+        "status": model2_status,
+        "inputs": "Age, WBC, RBC, HRR",
+    },
+    {
+        "title": "Model 3 (Cox)",
+        "subtitle": "Integrated model",
+        "risk": model3_risk,
+        "status": model3_status,
+        "inputs": "Age, smoking, BMI, SBP, WBC, RBC, HRR",
+    },
+]
+
+labels = [classify_risk(r["risk"])[0] for r in results]
+final_label = consensus_label(labels)
 
 with right:
-    k1, k2, k3, k4 = st.columns(4)
-    kpis = [
-        (k1, "linear-gradient(90deg,#a855f7,#ec4899)", "Risk index", f"{risk_index:.2f}", "Composite linear score under selected model"),
-        (k2, "linear-gradient(90deg,#3b82f6,#06b6d4)", "Relative hazard", f"{rh:.2e}", "Cox-based relative hazard scale"),
-        (k3, "linear-gradient(90deg,#10b981,#84cc16)", "5-year risk", f"{risk*100:.2f}%", "Absolute risk estimate"),
-        (k4, "linear-gradient(90deg,#f59e0b,#f97316)", "Risk profile", profile, "Output label for interface display"),
-    ]
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown("### Risk results")
+    st.markdown('<div class="smallcap">Three-model comparison</div>', unsafe_allow_html=True)
 
-    for col, grad, title, value, desc in kpis:
+    r1, r2, r3 = st.columns(3)
+    for col, item in zip([r1, r2, r3], results):
+        label, tag_cls = classify_risk(item["risk"])
+        risk_text = f"{item['risk']*100:.2f}%" if item["risk"] is not None else "—"
         with col:
-            st.markdown(f'''
-            <div class="kpi-card">
-              <div class="kpi-bar" style="background:{grad}"></div>
-              <div style="font-size:0.95rem;color:#64748b">{title}</div>
-              <div style="margin-top:0.35rem;font-size:2.1rem;font-weight:700;color:#020617">{value}</div>
-              <div style="margin-top:0.35rem;font-size:0.88rem;color:#64748b">{desc}</div>
-            </div>
-            ''', unsafe_allow_html=True)
-
-    tab1, tab2, tab3, tab4 = st.tabs(["Risk profile", "Variable contribution", "Model explanation", "Workflow"])
-
-    with tab1:
-        c1, c2 = st.columns([1.25, 0.85], gap="large")
-        with c1:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown(f"### Risk profile &nbsp;&nbsp;<span class='badge'>{sex} · {model}</span>", unsafe_allow_html=True)
-            st.markdown('<div class="smallcap" style="margin-top:1rem">Relative hazard scale</div>', unsafe_allow_html=True)
-
-            width_pct = max(2, min(100, risk_index))
-            st.markdown(f'''
-            <div class="profile-bar-bg"><div class="profile-bar-fill" style="width:{width_pct}%"></div></div>
-            <div style="display:flex;justify-content:space-between;margin-top:0.45rem;color:#64748b;font-size:0.88rem"><span>Lower</span><span>Higher</span></div>
-            ''', unsafe_allow_html=True)
-
             st.markdown(
-                '''
-                <div class="soft-card" style="margin-top:1rem; font-size:1rem; line-height:1.8; color:#475569;">
-                This profile summarizes a sex-specific Cox-based complementary assessment using age and routine CBC markers available in structured electronic health records.
+                f'''
+                <div class="result-card">
+                  <div class="smallcap">{item['title']}</div>
+                  <div style="font-size:1rem;font-weight:700;color:#0f172a;margin-top:0.2rem">{item['subtitle']}</div>
+                  <div class="big-number" style="margin-top:0.85rem">{risk_text}</div>
+                  <div style="margin-top:0.4rem"><span class="tag {tag_cls}">{label}</span></div>
+                  <hr>
+                  <div class="note"><b>Inputs:</b> {item['inputs']}</div>
+                  <div class="note" style="margin-top:0.45rem"><b>Status:</b> {item['status']}</div>
                 </div>
                 ''',
                 unsafe_allow_html=True,
             )
 
-            st.markdown("#### Active variables")
-            c3, c4 = st.columns(2)
-            cards = [
-                (c3, "AGE", p["beta"]["age"], vals["age"]),
-                (c4, "HRR", p["beta"]["hrr"], vals["hrr"]),
-                (c3, "RBC", p["beta"]["rbc"], vals["rbc"]),
-                (c4, "WBC", p["beta"]["wbc"], vals["wbc"]),
-            ]
-            for col, name, beta_v, input_v in cards:
-                with col:
-                    st.markdown(f'''
-                    <div class="soft-card">
-                      <div class="smallcap">{name}</div>
-                      <div style="font-size:1.2rem;font-weight:700;color:#020617">β = {beta_v:.4f}</div>
-                      <div style="margin-top:0.35rem;color:#64748b">Input = {input_v}</div>
-                    </div>
-                    ''', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+    overall_tag_cls = {"Low": "tag-low", "Borderline": "tag-borderline", "High": "tag-high", "No result": "tag-na"}.get(final_label, "tag-na")
+    st.markdown(
+        f'''
+        <div class="card-soft" style="margin-top:1rem">
+          <div class="smallcap">Suggested reading</div>
+          <div style="margin-top:0.35rem"><span class="tag {overall_tag_cls}">Consensus: {final_label}</span></div>
+          <div class="note" style="margin-top:0.55rem">
+            This summary is designed for complementary use in structured EHR workflows. It does not replace clinician judgement. When multiple models are available, the combined pattern is more informative than any single score alone.
+          </div>
+        </div>
+        ''',
+        unsafe_allow_html=True,
+    )
 
-        with c2:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown("### Summary")
-            summary_rows = [
-                ("Selected sex", sex),
-                ("Selected model", model),
-                ("Risk index", f"{risk_index:.2f}"),
-                ("Relative hazard", f"{rh:.2e}"),
-                ("5-year risk", f"{risk*100:.2f}%"),
-            ]
-            for k, v in summary_rows:
-                st.markdown(
-                    f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v}</span></div>',
-                    unsafe_allow_html=True,
-                )
+    st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown(f'''
-            <div style="border-radius:16px;padding:0.95rem 1rem;background:{profile_bg};color:{profile_fg};border:1px solid #e2e8f0">
-              <div style="font-weight:700">{profile}</div>
-              <div style="margin-top:0.25rem;font-size:0.92rem">{profile_desc}</div>
-            </div>
-            ''', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+    a, b = st.columns([1.05, 0.95], gap="large")
+    with a:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("### How to use this page")
+        st.markdown(
+            """
+1. Enter the currently available examination data.
+2. Review all model outputs side by side rather than selecting only one model.
+3. If BMI, SBP, or smoking status is unavailable, WHO and Model 3 may be unavailable, but Model 2 can still be used.
+4. Use the result as a complementary screening signal for follow-up assessment inside the EHR workflow.
+"""
+        )
+        st.markdown('</div>', unsafe_allow_html=True)
+    with b:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown("### Technical note")
+        st.markdown(TECH_NOTE)
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    with tab2:
-        c1, c2 = st.columns([1.05, 0.95], gap="large")
-        with c1:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown("### Variable contribution")
-            st.caption("Current-input contribution to the model linear predictor")
-
-            display = [
-                ("Age", contrib["age"], "#3b82f6", "#8b5cf6"),
-                ("WBC", contrib["wbc"], "#06b6d4", "#2563eb"),
-                ("RBC", contrib["rbc"], "#8b5cf6", "#d946ef"),
-                ("HRR", contrib["hrr"], "#ec4899", "#f43f5e"),
-            ]
-            max_abs = max(abs(x[1]) for x in display) if display else 1.0
-
-            for label, val, c_from, c_to in display:
-                width = max(3, abs(val) / max_abs * 100)
-                direction = "Upward" if val >= 0 else "Downward"
-                st.markdown(f'''
-                <div class="soft-card" style="margin-bottom:0.9rem">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div>
-                      <div style="font-weight:700;color:#020617">{label}</div>
-                      <div style="font-size:0.9rem;color:#64748b">Current contribution = {val:.3f}</div>
-                    </div>
-                    <div class="badge">{direction}</div>
-                  </div>
-                  <div style="height:14px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-top:0.8rem">
-                    <div style="height:14px;width:{width}%;background:linear-gradient(90deg,{c_from},{c_to});border-radius:999px"></div>
-                  </div>
-                </div>
-                ''', unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c2:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown("### How to read variable contribution")
-            st.markdown('''
-            Variable contribution describes how much the current value of each predictor moves the linear predictor away from the sex-specific reference profile.
-
-            A positive contribution shifts the relative hazard upward, while a negative contribution shifts it downward. Larger absolute values indicate stronger influence under the current input combination.
-
-            These values reflect model contribution rather than causal effect size. They are intended to explain how the current risk estimate is assembled for the selected user inputs.
-            ''')
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    with tab3:
-        c1, c2 = st.columns([1.15, 0.85], gap="large")
-        with c1:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown("### Model explanation")
-            st.markdown('''
-            This interface implements a sex-specific Cox-based complementary cardiovascular risk assessment model.
-
-            **Core predictors**
-            - Age
-            - White blood cell count (WBC)
-            - Red blood cell count (RBC)
-            - Haemoglobin-to-red-cell-distribution-width ratio (HRR)
-
-            **Risk scale**
-            - The calculator returns a 5-year CVD risk estimate
-            - It also displays the Cox-based relative hazard scale and a risk index for interface interpretation
-
-            **Operational role**
-            - Designed for complementary risk assessment when routine CBC markers are already available in structured electronic health records
-            ''')
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with c2:
-            st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-            st.markdown("### Model coefficients")
-            for k, v in [
-                ("β(age)", p["beta"]["age"]),
-                ("β(HRR)", p["beta"]["hrr"]),
-                ("β(RBC)", p["beta"]["rbc"]),
-                ("β(WBC)", p["beta"]["wbc"]),
-                ("S0(5)", p["S0"]),
-            ]:
-                st.markdown(
-                    f'<div class="summary-row"><span style="color:#64748b">{k}</span><span style="font-weight:700;color:#020617">{v:.4f}</span></div>',
-                    unsafe_allow_html=True,
-                )
-            st.markdown("</div>", unsafe_allow_html=True)
-
-    with tab4:
-        st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-        st.markdown("### Suggested workflow")
-        w1, w2, w3, w4 = st.columns(4)
-        steps = [
-            (w1, "1", "Input capture", "Enter or verify sex, age, HRR, RBC, and WBC."),
-            (w2, "2", "Model calculation", "The interface standardizes inputs and computes the Cox-based risk estimate."),
-            (w3, "3", "Risk interpretation", "Review the 5-year risk, relative hazard scale, and contribution pattern."),
-            (w4, "4", "Operational use", "Use the result as a complementary risk signal in routine cardiovascular assessment."),
-        ]
-        grads = [
-            "linear-gradient(90deg,#3b82f6,#06b6d4)",
-            "linear-gradient(90deg,#8b5cf6,#d946ef)",
-            "linear-gradient(90deg,#10b981,#84cc16)",
-            "linear-gradient(90deg,#f59e0b,#f97316)",
-        ]
-        for (col, n, title, desc), grad in zip(steps, grads):
-            with col:
-                st.markdown(f'''
-                <div class="soft-card" style="height:100%">
-                  <div style="width:40px;height:40px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;background:{grad};margin-bottom:0.8rem">{n}</div>
-                  <div style="font-size:1.08rem;font-weight:700;color:#020617">{title}</div>
-                  <div style="margin-top:0.45rem;line-height:1.8;color:#64748b;font-size:0.92rem">{desc}</div>
-                </div>
-                ''', unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown('<div class="card" style="margin-top:1rem">', unsafe_allow_html=True)
+    st.markdown("### Design rationale")
+    st.markdown(
+        """
+- The page shows WHO, Model 2, and Model 3 together.
+- Coefficients, intermediate linear predictors, and variable-contribution panels are intentionally removed from the main interface.
+- The emphasis is on risk output, availability of each model, and a workflow-compatible comparison that can later be embedded into an EHR system.
+"""
+    )
+    st.markdown('</div>', unsafe_allow_html=True)
