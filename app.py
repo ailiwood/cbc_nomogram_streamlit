@@ -290,10 +290,10 @@ def classify_risk(risk: Optional[float]) -> Tuple[str, str]:
         return "Unavailable", "badge-na"
     pct = risk * 100
     if pct < 2.5:
-        return "Low", "badge-low"
+        return "Lower risk", "badge-low"
     if pct < 5.0:
-        return "Borderline", "badge-borderline"
-    return "High", "badge-high"
+        return "Borderline risk", "badge-borderline"
+    return "High risk", "badge-high"
 
 
 def smoking_value(smoking: str) -> Optional[int]:
@@ -384,13 +384,13 @@ def cox_risk(values: Dict[str, Optional[float]], cfg: Dict, required: List[str],
 
 
 def concordance_text(labels: List[str]) -> Tuple[str, str, str]:
-    usable = [x for x in labels if x in {"Low", "Borderline", "High"}]
+    usable = [x for x in labels if x in {"Lower risk", "Borderline risk", "High risk"}]
     if not usable:
         return "No model output available", "0/3 available", "Enter all required inputs to generate model output."
 
-    high_n = sum(x == "High" for x in usable)
-    border_n = sum(x == "Borderline" for x in usable)
-    low_n = sum(x == "Low" for x in usable)
+    high_n = sum(x == "High risk" for x in usable)
+    border_n = sum(x == "Borderline risk" for x in usable)
+    low_n = sum(x == "Lower risk" for x in usable)
     available_n = len(usable)
 
     if high_n == available_n:
@@ -479,9 +479,16 @@ with left:
 
     case = st.session_state.case.copy()
 
-    c1, c2 = st.columns(2)
-    with c1:
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
         case["age"] = num_input("Age", "age_input", case["age"], *RANGES["age"], 1.0, "years", digits=0)
+    with r1c2:
+        case["wbc"] = num_input("WBC", "wbc_input", case["wbc"], *RANGES["wbc"], 0.01, "×10⁹/L")
+
+    r2c1, r2c2 = st.columns(2)
+    with r2c1:
+        case["sbp"] = num_input("SBP", "sbp_input", case["sbp"], *RANGES["sbp"], 1.0, "mmHg", digits=0)
+    with r2c2:
         case["rbc"] = num_input(
             "RBC",
             "rbc_input",
@@ -490,11 +497,12 @@ with left:
             0.01,
             "×10¹²/L",
         )
+
+    r3c1, r3c2 = st.columns(2)
+    with r3c1:
         case["bmi"] = num_input("BMI", "bmi_input", case["bmi"], *RANGES["bmi"], 0.1, "kg/m²")
-    with c2:
-        case["wbc"] = num_input("WBC", "wbc_input", case["wbc"], *RANGES["wbc"], 0.01, "×10⁹/L")
+    with r3c2:
         case["hrr"] = num_input("HRR", "hrr_input", case["hrr"], *RANGES["hrr"], 0.01, "ratio")
-        case["sbp"] = num_input("SBP", "sbp_input", case["sbp"], *RANGES["sbp"], 1.0, "mmHg", digits=0)
 
     case["smoking"] = st.selectbox(
         "Smoking",
@@ -529,9 +537,9 @@ with left:
         f'''
         <div class="soft-card" style="margin-top:0.9rem">
           <div class="smallcap">Case summary</div>
-          <div class="case-line"><b>{sex}</b>, {int(case['age'])} y</div>
-          <div class="case-line">RBC {case['rbc']:.2f} ×10¹²/L &nbsp;|&nbsp; WBC {case['wbc']:.2f} ×10⁹/L &nbsp;|&nbsp; HRR {case['hrr']:.2f}</div>
-          <div class="case-line">BMI {case['bmi']:.1f} kg/m² &nbsp;|&nbsp; SBP {case['sbp']:.0f} mmHg &nbsp;|&nbsp; {smoking_txt}</div>
+          <div class="case-line"><b>{sex}</b>, Age {int(case['age'])} y &nbsp;|&nbsp; WBC {case['wbc']:.2f} ×10⁹/L</div>
+          <div class="case-line">SBP {case['sbp']:.0f} mmHg &nbsp;|&nbsp; RBC {case['rbc']:.2f} ×10¹²/L</div>
+          <div class="case-line">BMI {case['bmi']:.1f} kg/m² &nbsp;|&nbsp; HRR {case['hrr']:.2f} &nbsp;|&nbsp; {smoking_txt}</div>
         </div>
         ''',
         unsafe_allow_html=True,
