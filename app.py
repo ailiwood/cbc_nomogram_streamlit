@@ -292,7 +292,7 @@ def classify_risk(risk: Optional[float]) -> Tuple[str, str]:
     if pct < 2.5:
         return "Lower risk", "badge-low"
     if pct < 5.0:
-        return "Borderline risk", "badge-borderline"
+        return "Moderate risk", "badge-borderline"
     return "High risk", "badge-high"
 
 
@@ -384,12 +384,12 @@ def cox_risk(values: Dict[str, Optional[float]], cfg: Dict, required: List[str],
 
 
 def concordance_text(labels: List[str]) -> Tuple[str, str, str]:
-    usable = [x for x in labels if x in {"Lower risk", "Borderline risk", "High risk"}]
+    usable = [x for x in labels if x in {"Lower risk", "Moderate risk", "High risk"}]
     if not usable:
         return "No model output available", "0/3 available", "Enter all required inputs to generate model output."
 
     high_n = sum(x == "High risk" for x in usable)
-    border_n = sum(x == "Borderline risk" for x in usable)
+    border_n = sum(x == "Moderate risk" for x in usable)
     low_n = sum(x == "Lower risk" for x in usable)
     available_n = len(usable)
 
